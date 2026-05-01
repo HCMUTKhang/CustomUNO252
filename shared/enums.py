@@ -85,7 +85,20 @@ class StackingState(Enum):
 
 
 class MessageType(Enum):
-    """Network message type enumeration."""
+    """Network message type enumeration - all possible messages between Client and Server."""
+    # Client-to-Server messages
+    JOIN_ROOM = "join_room"  # Client joins a room
+    START_GAME = "start_game"  # Host starts the game
+    PLAY_CARD = "play_card"  # Client plays a card
+    DRAW_CARD = "draw_card"  # Client draws a card
+    RULE_8_REACTION = "rule_8_reaction"  # Client responds to Rule 8 reaction event
+
+    # Server-to-Client messages
+    GAME_STATE_UPDATE = "game_state_update"  # Server broadcasts complete game state
+    EVENT_BROADCAST = "event_broadcast"  # Server broadcasts UI events
+    ERROR_MESSAGE = "error_message"  # Server rejects invalid client action
+
+    # Legacy/deprecated (keeping for compatibility)
     HANDSHAKE = "handshake"
     ACTION = "action"
     STATE_UPDATE = "state_update"
@@ -93,7 +106,7 @@ class MessageType(Enum):
     GAME_END = "game_end"
     ERROR = "error"
     DISCONNECT = "disconnect"
-    REACTION_EVENT = "reaction_event"  # Rule 8: Eight played, broadcast reaction
-    REACTION_RESPONSE = "reaction_response"  # Client responds to Eight reaction
-    RULE_EFFECT = "rule_effect"  # Special rule effects (hand swap, etc.)
-    STACKING_UPDATE = "stacking_update"  # Stacking state change
+    REACTION_EVENT = "reaction_event"
+    REACTION_RESPONSE = "reaction_response"
+    RULE_EFFECT = "rule_effect"
+    STACKING_UPDATE = "stacking_update"
