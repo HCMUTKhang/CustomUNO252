@@ -222,3 +222,68 @@ class ErrorMessage(NetworkMessage):
         self.error_type = error_type
         self.message = message
 
+
+# =============================================================================
+# MESSAGE PARSING UTILITY
+# =============================================================================
+
+def parse_incoming_message(json_str: str) -> NetworkMessage:
+    """
+    Parse an incoming JSON message and return the appropriate message object.
+    This is the main entry point for deserializing network messages.
+    
+    Args:
+        json_str: JSON string received from socket
+        
+    Returns:
+        Appropriate NetworkMessage subclass instance
+        
+    Raises:
+        ValueError: If message format is invalid
+    """
+    try:
+        data = json.loads(json_str)
+        message_type_str = data.get('message_type')
+        
+        if not message_type_str:
+            raise ValueError("Missing 'message_type' field")
+            
+        message_type = MessageType(message_type_str)
+
+        # Route to appropriate message class based on type
+        if message_type == MessageType.JOIN_ROOM:
+            msg = JoinRoom(
+                username=data.get('username', ''),
+                player_id=data.get('player_id')
+            )
+            return msg
+        elif message_type == MessageType.START_GAME:
+            return StartGame()
+        elif message_type == MessageType.PLAY_CARD:
+            return PlayCard.from_dict(data)
+        elif message_type == MessageType.DRAW_CARD:
+            return DrawCard()
+        elif message_type == MessageType.RULE_8_REACTION:
+            return Rule8Reaction()
+        elif message_type == MessageType.GAME_STATE_UPDATE:
+            return GameStateUpdate.from_dict(data)
+        elif message_type == MessageType.EVENT_BROADCAST:
+            msg = EventBroadcast(
+                event_name=data.get('event_name', ''),
+                event_data=data.get('event_data', {})
+            )
+            return msg
+        elif message_type == MessageType.ERROR_MESSAGE:
+            msg = ErrorMessage(
+                error_type=data.get('error_type', ''),
+                message=data.get('message', '')
+            )
+            return msg
+        else:
+            raise ValueError(f"Unknown message type: {message_type_str}")
+
+    except json.JSONDecodeError as e:
+        raise ValueError(f"Invalid JSON format: {e}")
+    except (KeyError, ValueError) as e:
+        raise ValueError(f"Invalid message structure: {e}")
+

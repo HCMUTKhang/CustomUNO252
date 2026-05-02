@@ -278,7 +278,8 @@ class RuleEngine:
             is_valid: True if play is legal
             error_message: Reason for rejection, or "" if valid
         """
-        pass
+        pas
+        """
         Apply Stacking rule: Accumulate draw counts when +2 or +4 cards are stacked.
         
         Args:
