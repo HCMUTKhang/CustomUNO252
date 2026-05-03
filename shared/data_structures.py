@@ -20,7 +20,7 @@ class Card:
     @property
     def action_type(self) -> CardAction:
         """Get the action type of this card."""
-        pass
+        return CardAction(self.value) if self.value in CardAction._value2member_map_ else CardAction.NUMBER
     
     def to_dict(self) -> dict:
         """Convert card to dictionary for JSON serialization."""

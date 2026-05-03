@@ -29,7 +29,11 @@ class RuleEngine:
             enable_stacking: Enable draw card stacking (+2/+4 accumulation)
             cannot_win_with_action_card: Cannot use action card as final card
         """
-        pass
+        self.enable_rule_0 = enable_rule_0
+        self.enable_rule_7 = enable_rule_7
+        self.enable_rule_8 = enable_rule_8
+        self.enable_stacking = enable_stacking
+        self.cannot_win_with_action_card = cannot_win_with_action_card
     
     def is_valid_play(self, played_card: Card, top_card: Card,
                       active_wild_color: Optional[CardColor] = None) -> bool:
@@ -51,7 +55,16 @@ class RuleEngine:
         Returns:
             True if play is valid, False if illegal
         """
-        pass
+        if top_card.value in [CardValue.WILD, CardValue.WILD_DRAW_FOUR]:
+            if active_wild_color is None:
+                return False  # Should not happen, but reject if no active color
+            return (played_card.color == active_wild_color or
+                    played_card.value in [CardValue.WILD, CardValue.WILD_DRAW_FOUR, CardValue.DRAW_TWO if self.enable_stacking else None])
+        
+        if played_card.color == top_card.color or played_card.value == top_card.value:
+            return True
+        
+        return False
     
     def is_playable_hand_exists(self, hand: List[Card], top_card: Card,
                                 active_wild_color: Optional[CardColor] = None) -> bool:
@@ -67,7 +80,12 @@ class RuleEngine:
         Returns:
             True if hand contains at least one playable card
         """
-        pass
+        if not hand:
+            return False
+        for card in hand:
+            if self.is_valid_play(card, top_card, active_wild_color):
+                return True
+        return False
     
     def check_uno(self, hand_size: int) -> bool:
         """
@@ -79,7 +97,7 @@ class RuleEngine:
         Returns:
             True if player has exactly 1 card left
         """
-        pass
+        return hand_size == 1
     
     def can_win_with_card(self, card: Card) -> bool:
         """
@@ -92,7 +110,11 @@ class RuleEngine:
         Returns:
             True if this card can be used to win, False if not allowed
         """
-        pass
+        if not self.cannot_win_with_action_card:
+            return True
+        return card.value in [CardValue.ZERO, CardValue.ONE, CardValue.TWO, CardValue.THREE,
+                              CardValue.FOUR, CardValue.FIVE, CardValue.SIX, CardValue.SEVEN,
+                              CardValue.EIGHT, CardValue.NINE]
     
     def apply_rule_0(self, current_player_id: int, playing_player_id: int,
                      target_player_id: int, hand_direction: str) -> bool:
@@ -210,8 +232,27 @@ class RuleEngine:
             is_valid_stacking: True if stacking is allowed
             total_penalty: New accumulated penalty, or None if stacking not valid
         """
-        pass
-    
+        current_penalty = current_stacking_state.accumulated_penalty
+        last_card = current_stacking_state.last_card_played
+        last_responder = current_stacking_state.responder_player_id
+        valid_stacking = False
+        new_penalty = current_penalty
+        if new_card.value == CardValue.DRAW_TWO:
+            if last_card and last_card.value in [CardValue.DRAW_TWO, CardValue.WILD_DRAW_FOUR]:
+                valid_stacking = True
+                new_penalty += 2
+        elif new_card.value == CardValue.WILD_DRAW_FOUR:
+            if last_card and last_card.value in [CardValue.DRAW_TWO, CardValue.WILD_DRAW_FOUR]:
+                valid_stacking = True
+                new_penalty += 4
+        if valid_stacking:
+            current_stacking_state.is_active = True
+            current_stacking_state.accumulated_penalty = new_penalty
+            current_stacking_state.last_card_played = new_card
+            # Responder player ID will be updated to the next player who must respond
+            current_stacking_state.responder_player_id = None  # To be set by game engine when turn advances
+        return valid_stacking, new_penalty if valid_stacking else None
+            
     def get_card_action_type(self, card: Card) -> CardAction:
         """
         Get the action type of a card (Number, Skip, Reverse, etc.).
@@ -223,7 +264,7 @@ class RuleEngine:
         Returns:
             CardAction enumeration value
         """
-        pass
+        return card.action_type
     
     def calculate_card_points(self, card: Card) -> int:
         """
@@ -239,7 +280,16 @@ class RuleEngine:
         Returns:
             Point value of the card
         """
-        pass
+        if card.value in [CardValue.ZERO, CardValue.ONE, CardValue.TWO, CardValue.THREE,
+                          CardValue.FOUR, CardValue.FIVE, CardValue.SIX, CardValue.SEVEN,
+                          CardValue.EIGHT, CardValue.NINE]:
+            return int(card.value)
+        elif card.value in [CardValue.SKIP, CardValue.REVERSE, CardValue.DRAW_TWO]:
+            return 20
+        elif card.value in [CardValue.WILD, CardValue.WILD_DRAW_FOUR]:
+            return 50
+        else:
+            return 0  # Should not happen
     
     def calculate_hand_points(self, hand: List[Card]) -> int:
         """
@@ -251,7 +301,7 @@ class RuleEngine:
         Returns:
             Total points for the hand
         """
-        pass
+        return sum(self.calculate_card_points(card) for card in hand)
     
     def validate_play_legality(self, played_card: Card, top_card: Card,
                                player_has_playable: bool,
@@ -278,7 +328,6 @@ class RuleEngine:
             is_valid: True if play is legal
             error_message: Reason for rejection, or "" if valid
         """
-        pas
         """
         Apply Stacking rule: Accumulate draw counts when +2 or +4 cards are stacked.
         
@@ -290,27 +339,4 @@ class RuleEngine:
             Updated draw count
         """
         pass
-    
-    def calculate_card_points(self, card: Card) -> int:
-        """
-        Calculate points for a card (used for scoring).
-        
-        Args:
-            card: Card to score
-            
-        Returns:
-            Point value of the card
-        """
-        pass
-    
-    def calculate_hand_points(self, hand: List[Card]) -> int:
-        """
-        Calculate total points for a hand (used for round scoring).
-        
-        Args:
-            hand: List of cards in hand
-            
-        Returns:
-            Total points
-        """
-        pass
+
