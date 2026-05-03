@@ -38,7 +38,12 @@ class GameEngine:
             enable_stacking: Enable draw card stacking
             cannot_win_with_action: Disallow action cards as final card
         """
-        pass
+        self.state_update_callback = state_update_callback
+        self.enable_rule_0 = enable_rule_0
+        self.enable_rule_7 = enable_rule_7
+        self.enable_rule_8 = enable_rule_8
+        self.enable_stacking = enable_stacking
+        self.cannot_win_with_action = cannot_win_with_action
     
     def start_game(self, players: List[Player]) -> bool:
         """
@@ -51,7 +56,31 @@ class GameEngine:
         Returns:
             True if game started successfully
         """
-        pass
+        deck = Deck()
+        deck.initialize_deck()
+        deck.shuffle_draw_pile()
+        player_manager = PlayerManager(players)
+        # Deal initial hands
+        for player in players:
+            player.hand = deck.draw_multiple(7)
+        # Select starting player (first player in list)
+        starting_player_id = players[0].id if players else None
+        # Initialize game status and broadcast initial state
+        game_status = GameStatus(
+            game_state=GameState.PLAYING,
+            current_player_id=starting_player_id,
+            current_turn_count=0,
+            last_card_played=None,
+            draw_pile_count=deck.get_draw_pile_count(),
+            discard_pile_count=0,
+            turn_direction=TurnDirection.FORWARD,
+            stacking_state=StackingState.NONE,
+            reaction_event=ReactionEvent(state=ReactionStateEnum.NONE)
+        )
+        self.state_update_callback = game_status
+        return True
+
+        
     
     def end_game(self) -> Optional[int]:
         """
@@ -69,7 +98,26 @@ class GameEngine:
         Handles turn direction (forward/reverse), skipped players.
         Updates current player and broadcasts state.
         """
-        pass
+        if self.state_update_callback.game_state != GameState.PLAYING:
+            return  # Only progress turns if game is active
+        current_player_id = self.state_update_callback.current_player_id
+        turn_direction = self.state_update_callback.turn_direction
+        players = self.get_all_players()
+        if not players:
+            return  # No players, cannot progress
+        player_ids = [player.id for player in players if player.state != PlayerState.DISCONNECTED]
+        if current_player_id not in player_ids:
+            # Current player is disconnected, skip to next
+            next_player_id = self.get_next_player_id(current_player_id, turn_direction, player_ids)
+            self.state_update_callback.current_player_id = next_player_id
+            self.state_update_callback.current_turn_count += 1
+            self.broadcast_game_state_update()
+            return
+        # Normal turn progression
+        next_player_id = self.get_next_player_id(current_player_id, turn_direction, player_ids)
+        self.state_update_callback.current_player_id = next_player_id
+        self.state_update_callback.current_turn_count += 1
+        self.broadcast_game_state_update()
     
     def attempt_play_card(self, player_id: int, card_index: int,
                          target_color: Optional[CardColor] = None,
@@ -290,7 +338,7 @@ class GameEngine:
     
     def get_current_player_id(self) -> Optional[int]:
         """Get the ID of the player whose turn it is."""
-        pass
+        return self.state_update_callback.current_player_id
     
     def get_game_status(self) -> GameStatus:
         """Get the current game status for broadcasting."""
@@ -361,12 +409,14 @@ class GameEngine:
     
     def broadcast_game_state_update(self):
         """Broadcast current game state to all connected clients."""
-        pass
+        self.state_update_callback(self.get_game_status())
     
     def get_all_players(self) -> List[Player]:
         """Get list of all players in the game."""
-        pass
+        return self.state_update_callback.players
     
     def get_player(self, player_id: int) -> Optional[Player]:
         """Get a specific player by ID."""
-        pass
+        for player in self.get_all_players():
+            if player.id == player_id:
+                return player
