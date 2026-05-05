@@ -46,11 +46,12 @@ class Deck:
         Returns:
             Card object or None if unable to draw
         """
-        if self.draw_pile:
-            pass
-        else:
+        if not self.draw_pile:
+            if not self.discard_pile:
+                return None  # No cards available anywhere
             self.reshuffle_discard_to_draw()
-            self.discard_pile = []
+        if not self.draw_pile:
+            return None
         return self.draw_pile.pop()
     
     def draw_multiple(self, count: int) -> List[Card]:
@@ -63,14 +64,14 @@ class Deck:
         Returns:
             List of Card objects
         """
-        drawed_cards = List[Card]()
+        drawn_cards: List[Card] = []
         for _ in range(count):
             card = self.draw_card()
-            if card:
-                drawed_cards.append(card)
+            if card is not None:
+                drawn_cards.append(card)
             else:
                 break  # No more cards to draw
-        return drawed_cards
+        return drawn_cards
     
     def discard_card(self, card: Card):
         """

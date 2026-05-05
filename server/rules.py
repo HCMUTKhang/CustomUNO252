@@ -132,7 +132,17 @@ class RuleEngine:
         Returns:
             True if Rule 0 play is valid
         """
-        pass
+        if not self.enable_rule_0:
+            return False
+        # Only current player may play Rule 0
+        if playing_player_id != current_player_id:
+            return False
+        # Target must be different from the player passing
+        if target_player_id == current_player_id:
+            return False
+        if hand_direction not in ("forward", "backward"):
+            return False
+        return True
     
     def apply_rule_7(self, player_id: int, played_card: Card,
                      target_player_id: int) -> bool:
@@ -149,7 +159,13 @@ class RuleEngine:
         Returns:
             True if swap is valid
         """
-        pass
+        if not self.enable_rule_7:
+            return False
+        if played_card.value != CardValue.SEVEN:
+            return False
+        if target_player_id == player_id:
+            return False
+        return True
     
     def apply_rule_8(self, triggered_by_player_id: int, played_card: Card,
                      all_player_ids: List[int]) -> ReactionEvent:
@@ -173,7 +189,19 @@ class RuleEngine:
         Returns:
             ReactionEvent object with event tracking information
         """
-        pass
+        import time
+        from shared.enums import ReactionEventState
+        event = ReactionEvent(
+            is_active=True,
+            triggered_by_player_id=triggered_by_player_id,
+            triggered_card=played_card,
+            event_start_time=time.time(),
+            timeout_seconds=3.0,
+            responders={},
+            state=ReactionEventState.PENDING,
+            penalty_drawer_id=None
+        )
+        return event
     
     def validate_rule_8_response(self, reaction_event: ReactionEvent,
                                 responding_player_id: int,
@@ -189,7 +217,20 @@ class RuleEngine:
         Returns:
             True if response was valid and recorded
         """
-        pass
+        from shared.enums import ReactionEventState
+        if not reaction_event.is_active:
+            return False
+        if reaction_event.state != ReactionEventState.PENDING:
+            return False
+        # Check response is within timeout window
+        deadline = reaction_event.event_start_time + reaction_event.timeout_seconds
+        if response_time > deadline:
+            return False
+        # Ignore duplicate responses
+        if responding_player_id in reaction_event.responders:
+            return False
+        reaction_event.responders[responding_player_id] = response_time
+        return True
     
     def resolve_rule_8_event(self, reaction_event: ReactionEvent,
                              current_time: float) -> Optional[int]:
@@ -209,7 +250,22 @@ class RuleEngine:
         Returns:
             ID of player who must draw 2 cards, or None if all must draw
         """
-        pass
+        from shared.enums import ReactionEventState
+        reaction_event.is_active = False
+        reaction_event.state = ReactionEventState.RESOLVED
+
+        # Find players who did NOT respond (treat as responded at current_time)
+        # penalty_drawer_id = None means "all non-responders draw"
+        if not reaction_event.responders:
+            # Nobody responded — the triggering player is exempt; everyone else draws
+            reaction_event.penalty_drawer_id = None
+            return None
+
+        # Determine the slowest responder (latest response_time)
+        slowest_player_id = max(reaction_event.responders,
+                                key=lambda pid: reaction_event.responders[pid])
+        reaction_event.penalty_drawer_id = slowest_player_id
+        return slowest_player_id
     
     def apply_stacking(self, current_stacking_state: StackingState,
                       new_card: Card) -> Tuple[bool, Optional[int]]:
@@ -305,38 +361,32 @@ class RuleEngine:
     
     def validate_play_legality(self, played_card: Card, top_card: Card,
                                player_has_playable: bool,
-                               current_player_id: int, playing_player_id: int) -> Tuple[bool, str]:
+                               current_player_id: int, playing_player_id: int,
+                               active_wild_color: Optional[CardColor] = None) -> Tuple[bool, str]:
         """
         Comprehensive host-side validation of card play.
         Rejects invalid plays and returns error reason.
         
         Validates:
-        - Card is in player's hand
         - It's the correct player's turn
-        - Card is legal to play
-        - Not winning with action card (if rule enabled)
+        - Card is legal to play on the current top card
         
         Args:
             played_card: Card being played
             top_card: Top card on discard pile
-            player_has_playable: Whether player has playable card
+            player_has_playable: Whether player has any playable card
             current_player_id: Whose turn it should be
             playing_player_id: Who is trying to play
+            active_wild_color: Active color override when top card is wild
             
         Returns:
             Tuple: (is_valid, error_message)
             is_valid: True if play is legal
             error_message: Reason for rejection, or "" if valid
         """
-        """
-        Apply Stacking rule: Accumulate draw counts when +2 or +4 cards are stacked.
-        
-        Args:
-            draw_count: Current accumulated draw count
-            new_card: New card being stacked
-            
-        Returns:
-            Updated draw count
-        """
-        pass
+        if playing_player_id != current_player_id:
+            return False, "WRONG_TURN"
+        if not self.is_valid_play(played_card, top_card, active_wild_color):
+            return False, "ILLEGAL_MOVE"
+        return True, ""
 
