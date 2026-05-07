@@ -86,6 +86,10 @@ class GameClient:
             on_host_click=self._on_host_click,
             on_join_click=self._on_join_click,
         )
+        self.input_handler.set_menu_getters(
+            name_getter=self.menu_screen.get_player_name,
+            ip_getter=self.menu_screen.get_server_ip,
+        )
         self.lobby_screen = LobbyScreen(
             on_start_game=self._on_start_game,
             on_leave_room=self._on_leave_room,
@@ -109,6 +113,9 @@ class GameClient:
 
             # 1. Collect and dispatch pygame events
             events = self.renderer.get_events()
+            if self._screen == "menu" and self.menu_screen:
+                for event in events:
+                    self.menu_screen.handle_pygame_event(event)
             self.input_handler.process_events(events)
 
             # 2. Drain server message queue

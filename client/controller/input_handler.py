@@ -40,6 +40,8 @@ class InputHandler:
 
     def __init__(self, action_callback: Callable):
         self._callback: Callable = action_callback
+        self._menu_name_getter: Optional[Callable] = None
+        self._menu_ip_getter: Optional[Callable] = None
 
         # Mouse state
         self._mouse_pos: Tuple[int, int] = (0, 0)
@@ -82,6 +84,11 @@ class InputHandler:
     def update_direction_zones(self, zones: List[Tuple[pygame.Rect, TurnDirection]]):
         """Register direction buttons for Rule-0 flow."""
         self._direction_zones = zones
+
+    def set_menu_getters(self, name_getter: Callable, ip_getter: Callable):
+        """Wire MenuScreen text-field getters so host/join callbacks carry the typed values."""
+        self._menu_name_getter = name_getter
+        self._menu_ip_getter = ip_getter
 
     def set_input_enabled(self, enabled: bool):
         """Block or unblock player interaction (e.g. when not their turn)."""
@@ -168,12 +175,15 @@ class InputHandler:
 
         if "host_game" in self._button_zones:
             if self._button_zones["host_game"].collidepoint(pos):
-                self._callback("host_game", {})
+                name = self._menu_name_getter() if self._menu_name_getter else "Player"
+                self._callback("host_game", {"player_name": name})
                 return
 
         if "join_game" in self._button_zones:
             if self._button_zones["join_game"].collidepoint(pos):
-                self._callback("join_game", {})
+                name = self._menu_name_getter() if self._menu_name_getter else "Player"
+                ip = self._menu_ip_getter() if self._menu_ip_getter else "localhost"
+                self._callback("join_game", {"player_name": name, "server_ip": ip})
                 return
 
         # 5. Card in hand
