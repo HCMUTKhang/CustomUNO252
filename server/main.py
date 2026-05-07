@@ -51,7 +51,10 @@ class GameServer:
     def start(self):
         """Start the server and listen for connections."""
         print("[GAMESERVER] Starting server...")
-        self.network.start(message_callback=self.on_client_message)
+        self.network.start(
+            message_callback=self.on_client_message,
+            disconnect_callback=self.on_client_disconnect,
+        )
         print("[GAMESERVER] Server started successfully")
     
     def stop(self):
@@ -110,34 +113,28 @@ class GameServer:
     def on_client_disconnect(self, client_id: int):
         """
         Handle client disconnection.
-        Removes player from game, reassigns host if necessary.
-        
-        Args:
-            client_id: ID of disconnected client
+        Removes player from game, reassigns host if necessary, broadcasts lobby update.
         """
         with self.lock:
             if client_id not in self.players:
                 return
-            
+
             player_name = self.players[client_id].name
             is_host = self.players[client_id].is_host
-            
-            # Remove player
+
             del self.players[client_id]
             print(f"[GAMESERVER] Player {player_name} (client {client_id}) disconnected")
-            
-            # If host disconnected and others remain in lobby, reassign host
-            if is_host and len(self.players) > 0 and self.game_state == GameState.LOBBY:
-                # Find first connected player
-                for remaining_client_id, player in self.players.items():
-                    if player.is_connected:
-                        player.is_host = True
-                        self.host_client_id = remaining_client_id
-                        print(f"[GAMESERVER] Host reassigned to client {remaining_client_id}")
-                        
-                        # Broadcast lobby update
-                        self._broadcast_lobby_update()
-                        break
+
+            # Reassign host if needed
+            if is_host and self.players and self.game_state == GameState.LOBBY:
+                new_host_id, new_host = next(iter(self.players.items()))
+                new_host.is_host = True
+                self.host_client_id = new_host_id
+                print(f"[GAMESERVER] Host reassigned to client {new_host_id}")
+
+        # Broadcast updated lobby to remaining players (outside lock to avoid deadlock)
+        if self.players:
+            self._broadcast_lobby_update()
     
     def handle_handshake(self, client_id: int, message: NetworkMessage):
         """

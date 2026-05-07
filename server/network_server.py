@@ -18,37 +18,31 @@ class NetworkServer:
     """
 
     def __init__(self, host: str = 'localhost', port: int = 5000, max_clients: int = 10):
-        """
-        Initialize the network server.
-        
-        Args:
-            host: Server host address (default: localhost)
-            port: Server port (default: 5000)
-            max_clients: Maximum number of concurrent clients
-        """
         self.host = host
         self.port = port
         self.max_clients = max_clients
-        
+
         self.server_socket: Optional[socket.socket] = None
         self.clients: Dict[int, socket.socket] = {}  # client_id -> socket
         self.client_addresses: Dict[int, tuple] = {}  # client_id -> (host, port)
         self.client_counter = 0
         self.running = False
         self.message_callback: Optional[Callable] = None
-        
+        self.disconnect_callback: Optional[Callable] = None  # called with (client_id)
+
         # Thread synchronization
         self.lock = threading.Lock()
 
-    def start(self, message_callback: Callable):
+    def start(self, message_callback: Callable, disconnect_callback: Optional[Callable] = None):
         """
         Start the server and begin accepting connections.
-        
+
         Args:
-            message_callback: Function to call when a message is received.
-                            Signature: callback(client_id: int, message: NetworkMessage)
+            message_callback: Called on every received message — (client_id, NetworkMessage)
+            disconnect_callback: Called when a client disconnects — (client_id,)
         """
         self.message_callback = message_callback
+        self.disconnect_callback = disconnect_callback
         self.running = True
         
         # Create and bind socket
@@ -140,13 +134,17 @@ class NetworkServer:
                     del self.clients[client_id]
                 if client_id in self.client_addresses:
                     del self.client_addresses[client_id]
-            
+
             try:
                 client_socket.close()
-            except:
+            except Exception:
                 pass
-            
+
             print(f"[SERVER] Client {client_id} removed from server")
+
+            # Notify game layer so it can update lobby / game state
+            if self.disconnect_callback:
+                self.disconnect_callback(client_id)
 
     def send_to_client(self, client_id: int, message: NetworkMessage):
         """
