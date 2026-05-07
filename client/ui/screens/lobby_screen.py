@@ -79,7 +79,11 @@ class LobbyScreen:
             renderer: Renderer instance
         """
         renderer.draw_text("Lobby", (renderer.width//2, 40), font_size=30, color=theme.ACCENT, center=True)
-        renderer.draw_text(f"Room: {self.room_id}", (renderer.width//2, 80), font_size=16, color=(200,200,200), center=True)
+        if self._is_host:
+            from shared import get_local_ip
+            renderer.draw_text(f"Your IP: {get_local_ip()}  (port 5000)", (renderer.width//2, 80), font_size=18, color=(100, 220, 100), center=True)
+        else:
+            renderer.draw_text(f"Room: {self.room_id}", (renderer.width//2, 80), font_size=16, color=(200,200,200), center=True)
         # player list box
         box_x = 60
         box_y = 120
