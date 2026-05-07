@@ -148,6 +148,18 @@ class GameClient:
         screen = self._active_screen()
         if screen:
             screen.render(self.renderer)
+            # Register clickable zones with InputHandler if provided by screen
+            if self.input_handler:
+                if hasattr(screen, 'button_zones'):
+                    self.input_handler.update_button_zones(getattr(screen, 'button_zones') or {})
+                if hasattr(screen, 'card_zones'):
+                    self.input_handler.update_card_zones(getattr(screen, 'card_zones') or [])
+                if hasattr(screen, 'color_zones'):
+                    self.input_handler.update_color_zones(getattr(screen, 'color_zones') or [])
+                if hasattr(screen, 'target_zones'):
+                    self.input_handler.update_target_zones(getattr(screen, 'target_zones') or [])
+                if hasattr(screen, 'direction_zones'):
+                    self.input_handler.update_direction_zones(getattr(screen, 'direction_zones') or [])
         self.renderer.update_display()
 
     def shutdown(self):
@@ -245,6 +257,11 @@ class GameClient:
             if self.state.is_local_player_turn():
                 card: Optional[CardDTO] = action_data.get("card")
                 if card:
+                    # forward to game screen for visual feedback (flash)
+                    if self.game_screen:
+                        # InputHandler provides card_index; forward as visual event
+                        idx = action_data.get("card_index")
+                        self.game_screen.handle_input({"card_clicked_index": idx})
                     self._handle_card_clicked(card)
 
         elif action_type == "draw_card":

@@ -5,6 +5,7 @@ Manages screen setup, drawing, and frame rendering.
 
 import pygame
 from typing import List, Optional
+from client.ui import theme
 
 
 class Renderer:
@@ -22,7 +23,12 @@ class Renderer:
             height: Screen height
             fps: Target frames per second
         """
-        pass
+        self.width = width
+        self.height = height
+        self.fps = fps
+        self.screen = None
+        self._font = None
+        self._clock = None
     
     def initialize(self) -> bool:
         """
@@ -31,11 +37,23 @@ class Renderer:
         Returns:
             True if initialization successful
         """
-        pass
+        try:
+            pygame.init()
+            self.screen = pygame.display.set_mode((self.width, self.height))
+            pygame.display.set_caption("Custom UNO")
+            # default font loaded from theme
+            self._font = pygame.font.SysFont(theme.FONT_NAME, 24)
+            self._clock = pygame.time.Clock()
+            return True
+        except Exception:
+            return False
     
     def shutdown(self):
         """Shutdown Pygame and close the window."""
-        pass
+        try:
+            pygame.display.quit()
+        except Exception:
+            pass
     
     def clear_screen(self, color: tuple = (255, 255, 255)):
         """
@@ -44,11 +62,12 @@ class Renderer:
         Args:
             color: RGB color tuple
         """
-        pass
+        if self.screen:
+            self.screen.fill(color)
     
     def update_display(self):
         """Update the display to show the current frame."""
-        pass
+        pygame.display.flip()
     
     def get_events(self) -> List:
         """
@@ -57,10 +76,10 @@ class Renderer:
         Returns:
             List of pygame events
         """
-        pass
+        return list(pygame.event.get())
     
     def draw_text(self, text: str, pos: tuple, font_size: int = 24, 
-                  color: tuple = (0, 0, 0)):
+                  color: tuple = (0, 0, 0), center: bool = False):
         """
         Draw text on the screen.
         
@@ -70,7 +89,18 @@ class Renderer:
             font_size: Font size in pixels
             color: RGB color tuple
         """
-        pass
+        if not self.screen:
+            return
+        try:
+            font = pygame.font.SysFont(theme.FONT_NAME, font_size)
+        except Exception:
+            font = pygame.font.SysFont(None, font_size)
+        surf = font.render(text, True, color)
+        if center:
+            rect = surf.get_rect(center=pos)
+            self.screen.blit(surf, rect.topleft)
+        else:
+            self.screen.blit(surf, pos)
     
     def draw_image(self, image, pos: tuple, scale: Optional[tuple] = None):
         """
@@ -81,7 +111,22 @@ class Renderer:
             pos: Position (x, y)
             scale: Optional scale tuple (width, height)
         """
-        pass
+        if not self.screen or image is None:
+            return
+        surf = image
+        if scale:
+            surf = pygame.transform.smoothscale(image, scale)
+        self.screen.blit(surf, pos)
+
+    def draw_ellipse(self, color: tuple, rect: tuple, width: int = 0):
+        """Draw an ellipse on the screen."""
+        if not self.screen:
+            return
+        if isinstance(rect, pygame.Rect):
+            r = rect
+        else:
+            r = pygame.Rect(rect)
+        pygame.draw.ellipse(self.screen, color, r, width)
     
     def draw_rect(self, color: tuple, rect: tuple, filled: bool = True, width: int = 1):
         """
@@ -93,12 +138,33 @@ class Renderer:
             filled: Whether to fill the rectangle
             width: Border width if not filled
         """
-        pass
+        if not self.screen:
+            return
+        border_radius = 0
+        # Accept either a pygame.Rect or a tuple/list (x,y,w,h) optionally with 5th elem border_radius
+        if isinstance(rect, pygame.Rect):
+            r = rect
+        elif isinstance(rect, (tuple, list)):
+            if len(rect) >= 4:
+                x, y, w, h = rect[0], rect[1], rect[2], rect[3]
+                r = pygame.Rect(x, y, w, h)
+                if len(rect) >= 5:
+                    border_radius = int(rect[4])
+            else:
+                # fallback: try to create Rect directly (will raise for invalid inputs)
+                r = pygame.Rect(rect)
+        else:
+            r = pygame.Rect(rect)
+
+        if filled:
+            pygame.draw.rect(self.screen, color, r, border_radius=border_radius)
+        else:
+            pygame.draw.rect(self.screen, color, r, width, border_radius=border_radius)
     
     def get_tick(self) -> float:
         """Get the number of milliseconds since initialization."""
-        pass
+        return pygame.time.get_ticks()
     
     def is_running(self) -> bool:
         """Check if the game window is still open."""
-        pass
+        return pygame.display.get_init()

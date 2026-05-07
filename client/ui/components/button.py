@@ -24,7 +24,16 @@ class Button:
             text: Button text label
             on_click: Callback when button is clicked
         """
-        pass
+        self.x = x
+        self.y = y
+        self.width = width
+        self.height = height
+        self.text = text
+        self.on_click = on_click
+        self.enabled = True
+        self._hover = False
+        import pygame
+        self._rect = pygame.Rect(x, y, width, height)
     
     def set_position(self, x: int, y: int):
         """
@@ -34,7 +43,10 @@ class Button:
             x: X position
             y: Y position
         """
-        pass
+        self.x = x
+        self.y = y
+        import pygame
+        self._rect.topleft = (x, y)
     
     def set_text(self, text: str):
         """
@@ -43,7 +55,7 @@ class Button:
         Args:
             text: New text label
         """
-        pass
+        self.text = text
     
     def set_enabled(self, enabled: bool):
         """
@@ -52,7 +64,7 @@ class Button:
         Args:
             enabled: True to enable
         """
-        pass
+        self.enabled = enabled
     
     def is_mouse_over(self, mouse_pos: Tuple[int, int]) -> bool:
         """
@@ -64,7 +76,7 @@ class Button:
         Returns:
             True if mouse is over button
         """
-        pass
+        return self._rect.collidepoint(mouse_pos)
     
     def handle_click(self, mouse_pos: Tuple[int, int]) -> bool:
         """
@@ -76,7 +88,15 @@ class Button:
         Returns:
             True if click was on button
         """
-        pass
+        if not self.enabled:
+            return False
+        if self.is_mouse_over(mouse_pos):
+            try:
+                self.on_click()
+            except Exception:
+                pass
+            return True
+        return False
     
     def render(self, renderer):
         """
@@ -85,7 +105,20 @@ class Button:
         Args:
             renderer: Renderer instance
         """
-        pass
+        bg = (70, 130, 180) if self.enabled else (100, 100, 100)
+        mouse_pos = None
+        try:
+            import pygame
+            mouse_pos = pygame.mouse.get_pos()
+        except Exception:
+            mouse_pos = (0, 0)
+        self._hover = self.is_mouse_over(mouse_pos)
+        color = tuple(min(255, c + 30) for c in bg) if self._hover and self.enabled else bg
+        # shadow
+        renderer.draw_rect((0,0,0), (self.x+2, self.y+4, self.width, self.height, 8), filled=True)
+        renderer.draw_rect(color, (self.x, self.y, self.width, self.height, 8), filled=True)
+        # centered text
+        renderer.draw_text(self.text, (self.x + self.width//2, self.y + self.height//2), font_size=20, color=(255, 255, 255), center=True)
     
     def update(self, delta_time: float):
         """
@@ -94,4 +127,4 @@ class Button:
         Args:
             delta_time: Time since last frame
         """
-        pass
+        return
