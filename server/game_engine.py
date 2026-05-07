@@ -193,7 +193,8 @@ class GameEngine:
 
     def attempt_play_card(self, player_id: int, card_index: int,
                           target_color: Optional[CardColor] = None,
-                          target_player_id: Optional[int] = None) -> Tuple[bool, str]:
+                          target_player_id: Optional[int] = None,
+                          chosen_direction: Optional[TurnDirection] = None) -> Tuple[bool, str]:
         """
         Attempt to play a card from a player's hand.
 
@@ -302,8 +303,11 @@ class GameEngine:
             self.apply_rule_7_hand_swap(player_id, target_player_id)
 
         elif val == CardValue.ZERO and self.enable_rule_0 and target_player_id:
-            direction = "forward" if self.game_status.turn_direction == TurnDirection.FORWARD else "backward"
-            self.apply_rule_0_hand_pass(player_id, target_player_id, direction)
+            if chosen_direction is None:
+                direction_str = "forward" if self.game_status.turn_direction == TurnDirection.FORWARD else "backward"
+            else:
+                direction_str = "forward" if chosen_direction == TurnDirection.FORWARD else "backward"
+            self.apply_rule_0_hand_pass(player_id, target_player_id, direction_str)
 
         elif val == CardValue.EIGHT and self.enable_rule_8:
             all_ids = [p.player_id for p in self.get_all_players()

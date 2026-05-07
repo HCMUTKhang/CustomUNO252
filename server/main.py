@@ -6,11 +6,12 @@ Host-Authoritative: All game decisions made here, clients are dumb terminals.
 
 import threading
 import time
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 from server.network_server import NetworkServer
 from server.game_engine import GameEngine
 from shared.message_protocol import (
-    NetworkMessage, parse_incoming_message, JoinRoom, EventBroadcast, ErrorMessage
+    NetworkMessage, parse_incoming_message, JoinRoom, EventBroadcast,
+    ErrorMessage, GameStateUpdate, CardDTO, PlayCard
 )
 from shared.enums import MessageType, GameState
 from shared.data_structures import Player
@@ -206,8 +207,22 @@ class GameServer:
                 return
             
             print(f"[GAMESERVER] Host initiated game start")
-            # TODO: Initialize game engine and transition to PLAYING state
-            # For now, just broadcast that game is starting
+
+            # Initialize game engine if not already created
+            if self.game_engine is None:
+                self.game_engine = GameEngine(state_update_callback=self.broadcast_game_state)
+
+            self.game_state = GameState.PLAYING
+            success = self.game_engine.start_game(list(self.players.values()))
+            if not success:
+                error_msg = ErrorMessage(
+                    error_type="GAME_START_FAILED",
+                    message="Unable to initialize game state"
+                )
+                self.network.send_to_client(client_id, error_msg)
+                return
+
+            # Notify clients that the game is starting and send initial state
             event = EventBroadcast(
                 event_name="GAME_STARTING",
                 event_data={"message": "Game is starting..."}
@@ -222,14 +237,57 @@ class GameServer:
             client_id: ID of acting player
             message: PlayCard message
         """
-        # Route to game engine for validation
-        if self.game_engine:
-            # TODO: Implement game engine logic
-            print(f"[GAMESERVER] PlayCard from client {client_id}")
-        else:
+        if self.game_engine is None:
             error_msg = ErrorMessage(
                 error_type="GAME_NOT_STARTED",
                 message="Game has not started yet"
+            )
+            self.network.send_to_client(client_id, error_msg)
+            return
+
+        if not isinstance(message, PlayCard):
+            error_msg = ErrorMessage(
+                error_type="INVALID_MESSAGE",
+                message="Expected PlayCard message"
+            )
+            self.network.send_to_client(client_id, error_msg)
+            return
+
+        player = self.game_engine.get_player(client_id)
+        if player is None:
+            error_msg = ErrorMessage(
+                error_type="PLAYER_NOT_FOUND",
+                message="Player not found in current game"
+            )
+            self.network.send_to_client(client_id, error_msg)
+            return
+
+        card_index = None
+        for idx, card in enumerate(player.hand):
+            if card.color == message.card.color and card.value == message.card.value:
+                card_index = idx
+                break
+
+        if card_index is None:
+            error_msg = ErrorMessage(
+                error_type="CARD_NOT_IN_HAND",
+                message="Requested card is not in your hand"
+            )
+            self.network.send_to_client(client_id, error_msg)
+            return
+
+        success, error_text = self.game_engine.attempt_play_card(
+            client_id,
+            card_index,
+            target_color=message.chosen_color,
+            target_player_id=message.target_player_id,
+            chosen_direction=message.chosen_direction,
+        )
+
+        if not success:
+            error_msg = ErrorMessage(
+                error_type="ILLEGAL_MOVE",
+                message=error_text or "Cannot play that card"
             )
             self.network.send_to_client(client_id, error_msg)
     
@@ -240,14 +298,19 @@ class GameServer:
         Args:
             client_id: ID of acting player
         """
-        # Route to game engine for validation
-        if self.game_engine:
-            # TODO: Implement game engine logic
-            print(f"[GAMESERVER] DrawCard from client {client_id}")
-        else:
+        if self.game_engine is None:
             error_msg = ErrorMessage(
                 error_type="GAME_NOT_STARTED",
                 message="Game has not started yet"
+            )
+            self.network.send_to_client(client_id, error_msg)
+            return
+
+        playable, card = self.game_engine.attempt_draw_card(client_id)
+        if not playable and card is None:
+            error_msg = ErrorMessage(
+                error_type="INVALID_DRAW",
+                message="Cannot draw a card at this time"
             )
             self.network.send_to_client(client_id, error_msg)
     
@@ -269,11 +332,37 @@ class GameServer:
             )
             self.network.send_to_client(client_id, error_msg)
     
-    def broadcast_game_state(self):
+    def broadcast_game_state(self, game_status):
         """Broadcast current game state to all connected clients."""
-        # TODO: Implement full game state broadcast using GameStateUpdate
-        # This requires game engine implementation
-        pass
+        if self.game_engine is None or game_status is None:
+            return
+
+        player_hands = self.game_engine.get_player_hands()
+        top_card = self.game_engine.deck.peek_top_discard() if self.game_engine.deck else None
+        top_card_dto = CardDTO(color=top_card.color, value=top_card.value) if top_card else None
+        opponent_counts_template = {
+            str(pid): len(hand)
+            for pid, hand in player_hands.items()
+        }
+
+        for client_id, hand in player_hands.items():
+            client_hand_dtos = [CardDTO(color=c.color, value=c.value) for c in hand]
+            opponents = {
+                str(pid): len(other_hand)
+                for pid, other_hand in player_hands.items()
+                if pid != client_id
+            }
+
+            update = GameStateUpdate(
+                current_turn_player_id=game_status.current_player_id,
+                current_play_direction=game_status.turn_direction,
+                top_discard_card=top_card_dto,
+                client_hand=client_hand_dtos,
+                opponents_card_counts=opponents,
+                active_stacking_penalty=game_status.stacking_state.accumulated_penalty,
+                active_color=game_status.active_wild_color,
+            )
+            self.network.send_to_client(client_id, update)
     
     def broadcast_message(self, message: NetworkMessage, exclude_client_id: Optional[int] = None):
         """

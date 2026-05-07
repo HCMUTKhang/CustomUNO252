@@ -84,3 +84,6 @@ Plaintext
 [SERVER] Shutdown complete
 [GAMESERVER] Server stopped
 [MAIN] Server stopped
+
+
+Assets refs: https://narogame.itch.io/uno-game-assets/download/eyJpZCI6MTA0ODEzNiwiZXhwaXJlcyI6MTc3ODE0NTQ5Mn0%3d%2e0ukWtfvw6RcQaRgJml%2f3DMXv8nk%3d 
