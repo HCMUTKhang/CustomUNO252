@@ -158,6 +158,11 @@ class InputHandler:
                 self._callback("react_rule8", {})
                 return
 
+        if "uno_btn" in self._button_zones:
+            if self._button_zones["uno_btn"].collidepoint(pos):
+                self._callback("uno_click", {})
+                return
+
         if "draw_pile" in self._button_zones:
             if self._button_zones["draw_pile"].collidepoint(pos):
                 self._callback("draw_card", {})

@@ -301,6 +301,9 @@ class GameClient:
                     self.state.clear_pending_selection()
 
         # --- Rule 8 reaction ---
+        elif action_type == "uno_click":
+            self._on_uno_click()
+
         elif action_type == "react_rule8":
             if self.state.is_rule8_active() and not self.state.has_rule8_reacted():
                 self.network.send_message(Rule8Reaction())

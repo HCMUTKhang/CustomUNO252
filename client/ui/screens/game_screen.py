@@ -172,12 +172,15 @@ class GameScreen:
         panel_x = renderer.width - 240
         renderer.draw_text(f"Player 1", (panel_x + 100, 40), font_size=18, color=(255,255,255), center=True)
         renderer.draw_text("Player 1's turn", (panel_x + 100, 90), font_size=20, color=theme.ACCENT, center=True)
-        # Draw buttons
+        # Draw buttons — rects must match what is visually rendered
         b_w, b_h = 100, 40
-        renderer.draw_rect(theme.PRIMARY, (panel_x + 60, 140, b_w, b_h, 8), filled=True)
-        renderer.draw_text("Draw", (panel_x + 60 + b_w//2, 140 + b_h//2), font_size=16, color=(255,255,255), center=True)
-        renderer.draw_rect(theme.NEGATIVE, (panel_x + 60, 200, b_w, b_h, 8), filled=True)
-        renderer.draw_text("Say UNO", (panel_x + 60 + b_w//2, 200 + b_h//2), font_size=16, color=(255,255,255), center=True)
+        draw_bx = panel_x + 60
+        self._draw_rect = pygame.Rect(draw_bx, 140, b_w, b_h)
+        self._uno_rect  = pygame.Rect(draw_bx, 200, b_w, b_h)
+        renderer.draw_rect(theme.PRIMARY,   (self._draw_rect.x, self._draw_rect.y, b_w, b_h, 8), filled=True)
+        renderer.draw_text("Draw",    (self._draw_rect.centerx, self._draw_rect.centery), font_size=16, color=(255,255,255), center=True)
+        renderer.draw_rect(theme.NEGATIVE,  (self._uno_rect.x,  self._uno_rect.y,  b_w, b_h, 8), filled=True)
+        renderer.draw_text("Say UNO", (self._uno_rect.centerx,  self._uno_rect.centery),  font_size=16, color=(255,255,255), center=True)
 
         # render hand via CardDisplay instances (animated)
         self.card_zones = []
@@ -200,11 +203,11 @@ class GameScreen:
             self.card_zones.append((cd._rect.copy(), dto))
 
         # expose button zones for InputHandler
-        zones = {
-            "draw_pile": self._draw_rect,
+        self.button_zones = {
+            "draw_pile":    self._draw_rect,
+            "uno_btn":      self._uno_rect,
             "reaction_btn": self._reaction_rect,
         }
-        self.button_zones = zones
     
     def update(self, delta_time: float):
         """
