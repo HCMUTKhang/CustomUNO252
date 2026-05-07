@@ -109,6 +109,9 @@ class NetworkClient:
         except ConnectionResetError:
             print("[CLIENT] Server forcefully disconnected")
             self.connected = False
+        except OSError:
+            # Socket closed during shutdown — expected
+            pass
         except Exception as e:
             print(f"[CLIENT] Error in receive loop: {e}")
             self.connected = False
@@ -173,6 +176,11 @@ class NetworkClient:
         print("[CLIENT] Disconnecting from server...")
         self.running = False
         self.connected = False
+        if self.socket:
+            try:
+                self.socket.shutdown(socket.SHUT_RDWR)
+            except Exception:
+                pass
         self._cleanup()
 
     def _cleanup(self):
